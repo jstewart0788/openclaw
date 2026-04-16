@@ -161,6 +161,7 @@ export function renderMessageGroup(
     embedSandboxMode?: EmbedSandboxMode;
     allowExternalEmbedUrls?: boolean;
     contextWindow?: number | null;
+    userAvatar?: string | null;
     onDelete?: () => void;
   },
 ) {
@@ -200,6 +201,7 @@ export function renderMessageGroup(
           avatar: opts.assistantAvatar ?? null,
         },
         opts.basePath,
+        opts.userAvatar,
       )}
       <div class="chat-group-messages">
         ${group.messages.map((item, index) =>
@@ -491,6 +493,7 @@ function renderAvatar(
   role: string,
   assistant?: Pick<AssistantIdentity, "name" | "avatar">,
   basePath?: string,
+  userAvatar?: string | null,
 ) {
   const normalized = normalizeRoleForGrouping(role);
   const assistantName = assistant?.name?.trim() || "Assistant";
@@ -540,6 +543,14 @@ function renderAvatar(
         : normalized === "tool"
           ? "tool"
           : "other";
+
+  if (userAvatar && normalized === "user" && isAvatarUrl(userAvatar)) {
+    return html`<img
+      class="chat-avatar ${className}"
+      src="${userAvatar}"
+      alt="You"
+    />`;
+  }
 
   if (assistantAvatar && normalized === "assistant") {
     if (isAvatarUrl(assistantAvatar)) {

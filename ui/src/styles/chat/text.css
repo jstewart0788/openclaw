@@ -9,7 +9,7 @@
   border: 1px dashed rgba(255, 255, 255, 0.18);
   background: rgba(255, 255, 255, 0.04);
   color: var(--muted);
-  font-size: 12px;
+  font-size: 24px;
   line-height: 1.4;
 }
 
@@ -19,7 +19,7 @@
 }
 
 .chat-text {
-  font-size: 14px;
+  font-size: 28px;
   line-height: 1.5;
   word-wrap: break-word;
   overflow-wrap: break-word;
@@ -52,6 +52,12 @@
 .sidebar-markdown :where(.task-list-item-checkbox),
 .chat-thinking :where(.task-list-item-checkbox) {
   margin-right: 0.4em;
+  vertical-align: middle;
+}
+
+.chat-text .chat-emoji {
+  font-size: 2em;
+  line-height: 1;
   vertical-align: middle;
 }
 

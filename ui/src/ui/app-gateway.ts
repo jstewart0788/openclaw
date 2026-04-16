@@ -422,6 +422,12 @@ function handleSessionMessageGatewayEvent(
   if (!sessionKey || sessionKey !== host.sessionKey) {
     return;
   }
+  // Skip history reload during active chat runs — the optimistic user message
+  // is already in chatMessages and the streaming event handlers will manage
+  // state until the run completes, at which point history is reloaded anyway.
+  if (host.chatRunId) {
+    return;
+  }
   void loadChatHistory(host as unknown as ChatState);
 }
 

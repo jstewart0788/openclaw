@@ -65,6 +65,10 @@ export type ConfigProps = {
   setBorderRadius: (value: number) => void;
   gatewayUrl: string;
   assistantName: string;
+  userAvatar?: string | null;
+  userName?: string;
+  onUserAvatarChange?: (avatar: string | null) => void;
+  onUserNameChange?: (name: string) => void;
   configPath?: string | null;
   navRootLabel?: string;
   includeSections?: string[];
@@ -627,6 +631,72 @@ function renderAppearanceSection(props: ConfigProps) {
               `,
             )}
           </div>
+        </div>
+      </div>
+
+      <div class="settings-appearance__section">
+        <h3 class="settings-appearance__heading">Profile</h3>
+        <p class="settings-appearance__hint">Set your display name and avatar.</p>
+        <div style="display: flex; align-items: center; gap: 16px; margin-top: 8px">
+          <div
+            style="
+              width: 56px; height: 56px; border-radius: 50%; overflow: hidden;
+              background: var(--surface-2, #333); display: flex; align-items: center;
+              justify-content: center; cursor: pointer; flex-shrink: 0;
+              border: 2px solid var(--border, #444);
+            "
+            title="Click to change avatar"
+            @click=${() => {
+              const input = document.createElement("input");
+              input.type = "file";
+              input.accept = "image/png,image/jpeg,image/gif,image/webp";
+              input.onchange = () => {
+                const file = input.files?.[0];
+                if (!file || file.size > 2 * 1024 * 1024) {return;}
+                const reader = new FileReader();
+                reader.onload = () => {
+                  props.onUserAvatarChange?.(reader.result as string);
+                };
+                reader.readAsDataURL(file);
+              };
+              input.click();
+            }}
+          >
+            ${props.userAvatar
+              ? html`<img
+                  src="${props.userAvatar}"
+                  alt="Your avatar"
+                  style="width: 100%; height: 100%; object-fit: cover;"
+                />`
+              : html`<svg viewBox="0 0 24 24" fill="currentColor" width="24" height="24" style="opacity: 0.5">
+                  <circle cx="12" cy="8" r="4" />
+                  <path d="M20 21a8 8 0 1 0-16 0" />
+                </svg>`}
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 6px; flex: 1">
+            <label style="font-size: 12px; opacity: 0.7">Display Name</label>
+            <input
+              type="text"
+              class="input"
+              placeholder="You"
+              .value=${props.userName ?? ""}
+              @change=${(e: Event) => {
+                const val = (e.target as HTMLInputElement).value.trim();
+                props.onUserNameChange?.(val || "");
+              }}
+              style="max-width: 240px"
+            />
+          </div>
+          ${props.userAvatar
+            ? html`<button
+                class="btn btn--sm btn--ghost"
+                title="Remove avatar"
+                @click=${() => props.onUserAvatarChange?.(null)}
+                style="align-self: flex-start; margin-top: 18px"
+              >
+                ${icons.trash ?? "Remove"}
+              </button>`
+            : nothing}
         </div>
       </div>
 

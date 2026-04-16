@@ -230,6 +230,7 @@ export function renderChatControls(state: AppViewState) {
   const disableFocusToggle = state.onboarding;
   const showThinking = state.onboarding ? false : state.settings.chatShowThinking;
   const showToolCalls = state.onboarding ? true : state.settings.chatShowToolCalls;
+  const hideSystemPrompts = state.onboarding ? false : state.settings.chatHideSystemPrompts;
   const focusActive = state.onboarding ? true : state.settings.chatFocusMode;
   const toolCallsIcon = html`
     <svg
@@ -360,6 +361,31 @@ export function renderChatControls(state: AppViewState) {
         ${focusIcon}
       </button>
       <button
+        class="btn btn--sm btn--icon ${hideSystemPrompts ? "active" : ""}"
+        @click=${() => {
+          state.applySettings({
+            ...state.settings,
+            chatHideSystemPrompts: !state.settings.chatHideSystemPrompts,
+          });
+        }}
+        aria-pressed=${hideSystemPrompts}
+        title=${hideSystemPrompts ? "Show system prompts" : "Hide system prompts"}
+      >
+        <svg
+          width="18"
+          height="18"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"></path>
+          ${hideSystemPrompts ? html`<line x1="2" y1="2" x2="22" y2="22"></line>` : html`<circle cx="12" cy="12" r="3"></circle>`}
+        </svg>
+      </button>
+      <button
         class="btn btn--sm btn--icon ${hideCron ? "active" : ""}"
         @click=${() => {
           state.sessionsHideCron = !hideCron;
@@ -388,6 +414,7 @@ export function renderChatMobileToggle(state: AppViewState) {
   const disableFocusToggle = state.onboarding;
   const showThinking = state.onboarding ? false : state.settings.chatShowThinking;
   const showToolCalls = state.onboarding ? true : state.settings.chatShowToolCalls;
+  const hideSystemPrompts = state.onboarding ? false : state.settings.chatHideSystemPrompts;
   const focusActive = state.onboarding ? true : state.settings.chatFocusMode;
   const toolCallsIcon = html`
     <svg
@@ -545,6 +572,31 @@ export function renderChatMobileToggle(state: AppViewState) {
               title=${t("chat.focusToggle")}
             >
               ${focusIcon}
+            </button>
+            <button
+              class="btn btn--sm btn--icon ${hideSystemPrompts ? "active" : ""}"
+              @click=${() => {
+                state.applySettings({
+                  ...state.settings,
+                  chatHideSystemPrompts: !state.settings.chatHideSystemPrompts,
+                });
+              }}
+              aria-pressed=${hideSystemPrompts}
+              title=${hideSystemPrompts ? "Show system prompts" : "Hide system prompts"}
+            >
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"></path>
+                ${hideSystemPrompts ? html`<line x1="2" y1="2" x2="22" y2="22"></line>` : html`<circle cx="12" cy="12" r="3"></circle>`}
+              </svg>
             </button>
           </div>
         </div>

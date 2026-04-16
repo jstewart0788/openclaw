@@ -52,12 +52,15 @@ export type UiSettings = {
   chatFocusMode: boolean;
   chatShowThinking: boolean;
   chatShowToolCalls: boolean;
+  chatHideSystemPrompts: boolean;
   splitRatio: number; // Sidebar split ratio (0.4 to 0.7, default 0.6)
   navCollapsed: boolean; // Collapsible sidebar state
   navWidth: number; // Sidebar width when expanded (240–400px)
   navGroupsCollapsed: Record<string, boolean>; // Which nav groups are collapsed
   borderRadius: number; // Corner roundness (0–100, default 50)
   locale?: string;
+  userName?: string;
+  userAvatar?: string | null;
 };
 
 function isViteDevPage(): boolean {
@@ -190,6 +193,7 @@ export function loadSettings(): UiSettings {
     chatFocusMode: false,
     chatShowThinking: true,
     chatShowToolCalls: true,
+    chatHideSystemPrompts: true,
     splitRatio: 0.6,
     navCollapsed: false,
     navWidth: 220,
@@ -256,6 +260,11 @@ export function loadSettings(): UiSettings {
           ? snapBorderRadius(parsed.borderRadius)
           : defaults.borderRadius,
       locale: isSupportedLocale(parsed.locale) ? parsed.locale : undefined,
+      userName: normalizeOptionalString((parsed as { userName?: unknown }).userName) ?? undefined,
+      userAvatar:
+        typeof (parsed as { userAvatar?: unknown }).userAvatar === "string"
+          ? ((parsed as { userAvatar?: string }).userAvatar ?? null)
+          : null,
     };
     if ("token" in parsed) {
       persistSettings(settings);
@@ -317,6 +326,8 @@ function persistSettings(next: UiSettings) {
     borderRadius: next.borderRadius,
     sessionsByGateway,
     ...(next.locale ? { locale: next.locale } : {}),
+    ...(next.userName ? { userName: next.userName } : {}),
+    ...(next.userAvatar ? { userAvatar: next.userAvatar } : {}),
   };
   const serialized = JSON.stringify(persisted);
   try {

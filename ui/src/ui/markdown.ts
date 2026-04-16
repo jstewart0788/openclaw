@@ -512,10 +512,41 @@ export function toSanitizedMarkdownHtml(markdown: string): string {
     rendered = `<pre class="code-block">${escaped}</pre>`;
   }
   const sanitized = DOMPurify.sanitize(rendered, sanitizeOptions);
+  const withEmoji = wrapEmoji(sanitized);
   if (input.length <= MARKDOWN_CACHE_MAX_CHARS) {
-    setCachedMarkdown(input, sanitized);
+    setCachedMarkdown(input, withEmoji);
   }
-  return sanitized;
+  return withEmoji;
+}
+
+const EMOJI_RE =
+  /(\p{Emoji_Presentation}|\p{Emoji}\uFE0F)(\u200D(\p{Emoji_Presentation}|\p{Emoji}\uFE0F))*/gu;
+
+function wrapEmoji(html: string): string {
+  let inside = false;
+  let result = "";
+  for (let i = 0; i < html.length; i++) {
+    if (html[i] === "<") {
+      inside = true;
+      result += html[i];
+    } else if (html[i] === ">") {
+      inside = false;
+      result += html[i];
+    } else if (inside) {
+      result += html[i];
+    } else {
+      const rest = html.slice(i);
+      EMOJI_RE.lastIndex = 0;
+      const m = EMOJI_RE.exec(rest);
+      if (m && m.index === 0) {
+        result += `<span class="chat-emoji">${m[0]}</span>`;
+        i += m[0].length - 1;
+      } else {
+        result += html[i];
+      }
+    }
+  }
+  return result;
 }
 
 function renderEscapedPlainTextHtml(value: string): string {

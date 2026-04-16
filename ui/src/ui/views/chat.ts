@@ -1,3 +1,4 @@
+import "emoji-picker-element";
 import { html, nothing, type TemplateResult } from "lit";
 import { ref } from "lit/directives/ref.js";
 import { repeat } from "lit/directives/repeat.js";
@@ -41,7 +42,7 @@ import { toSanitizedMarkdownHtml } from "../markdown.ts";
 import type { SidebarContent } from "../sidebar-content.ts";
 import { detectTextDirection } from "../text-direction.ts";
 import type { GatewaySessionRow, SessionsListResult } from "../types.ts";
-import type { ChatItem, MessageGroup, ToolCard } from "../types/chat-types.ts";
+import type { ChatItem, MessageGroup, NormalizedMessage, ToolCard } from "../types/chat-types.ts";
 import type { ChatAttachment, ChatQueueItem } from "../ui-types.ts";
 import { agentLogoUrl, resolveAgentAvatarUrl } from "./agents-utils.ts";
 import { renderMarkdownSidebar } from "./markdown-sidebar.ts";
@@ -53,6 +54,7 @@ export type ChatProps = {
   thinkingLevel: string | null;
   showThinking: boolean;
   showToolCalls: boolean;
+  hideSystemPrompts: boolean;
   loading: boolean;
   sending: boolean;
   canAbort?: boolean;
@@ -82,6 +84,7 @@ export type ChatProps = {
   allowExternalEmbedUrls?: boolean;
   assistantName: string;
   assistantAvatar: string | null;
+  userAvatar?: string | null;
   localMediaPreviewRoots?: string[];
   assistantAttachmentAuthToken?: string | null;
   autoExpandToolCalls?: boolean;
@@ -295,6 +298,7 @@ interface ChatEphemeralState {
   searchOpen: boolean;
   searchQuery: string;
   pinnedExpanded: boolean;
+  emojiPickerOpen: boolean;
 }
 
 function createChatEphemeralState(): ChatEphemeralState {
@@ -310,6 +314,7 @@ function createChatEphemeralState(): ChatEphemeralState {
     searchOpen: false,
     searchQuery: "",
     pinnedExpanded: false,
+    emojiPickerOpen: false,
   };
 }
 
@@ -1273,6 +1278,7 @@ export function renderChat(props: ChatProps) {
                 onRequestUpdate: requestUpdate,
                 assistantName: props.assistantName,
                 assistantAvatar: assistantIdentity.avatar,
+                userAvatar: props.userAvatar,
                 basePath: props.basePath,
                 localMediaPreviewRoots: props.localMediaPreviewRoots ?? [],
                 assistantAttachmentAuthToken: props.assistantAttachmentAuthToken ?? null,
@@ -1566,6 +1572,61 @@ export function renderChat(props: ChatProps) {
               ${icons.paperclip}
             </button>
 
+            <div class="agent-chat__emoji-wrapper">
+              <button
+                class="agent-chat__input-btn ${vs.emojiPickerOpen ? "agent-chat__input-btn--active" : ""}"
+                @click=${() => {
+                  vs.emojiPickerOpen = !vs.emojiPickerOpen;
+                  requestUpdate();
+                }}
+                title="Emoji"
+                aria-label="Emoji picker"
+                ?disabled=${!props.connected}
+              >
+                ${icons.smile}
+              </button>
+              ${vs.emojiPickerOpen
+                ? html`
+                    <div
+                      class="agent-chat__emoji-backdrop"
+                      @click=${() => {
+                        vs.emojiPickerOpen = false;
+                        requestUpdate();
+                      }}
+                    ></div>
+                    <emoji-picker
+                      class="agent-chat__emoji-picker"
+                      .dataSource=${"./emoji-data.json"}
+                      @emoji-click=${(e: CustomEvent) => {
+                        const emoji = e.detail.unicode;
+                        if (emoji) {
+                          const textarea = document.querySelector<HTMLTextAreaElement>(
+                            ".agent-chat__input textarea, textarea"
+                          );
+                          if (textarea) {
+                            const start = textarea.selectionStart;
+                            const end = textarea.selectionEnd;
+                            const current = getDraft();
+                            const next = current.slice(0, start) + emoji + current.slice(end);
+                            props.onDraftChange(next);
+                            requestAnimationFrame(() => {
+                              const pos = start + emoji.length;
+                              textarea.setSelectionRange(pos, pos);
+                              textarea.focus();
+                            });
+                          } else {
+                            const current = getDraft();
+                            props.onDraftChange(current + emoji);
+                          }
+                        }
+                        vs.emojiPickerOpen = false;
+                        requestUpdate();
+                      }}
+                    ></emoji-picker>
+                  `
+                : nothing}
+            </div>
+
             ${isSttSupported()
               ? html`
                   <button
@@ -1729,6 +1790,15 @@ function groupMessages(items: ChatItem[]): Array<ChatItem | MessageGroup> {
   return result;
 }
 
+const SESSION_RESET_RE = /A new session was started via \/new or \/reset\./;
+
+function isSessionResetMessage(normalized: NormalizedMessage): boolean {
+  if (normalized.role.toLowerCase() !== "user") {return false;}
+  return normalized.content.some(
+    (item) => item.type === "text" && typeof item.text === "string" && SESSION_RESET_RE.test(item.text),
+  );
+}
+
 function buildChatItems(props: ChatProps): Array<ChatItem | MessageGroup> {
   const items: ChatItem[] = [];
   const history = Array.isArray(props.messages) ? props.messages : [];
@@ -1764,6 +1834,10 @@ function buildChatItems(props: ChatProps): Array<ChatItem | MessageGroup> {
     }
 
     if (!props.showToolCalls && normalized.role.toLowerCase() === "toolresult") {
+      continue;
+    }
+
+    if (props.hideSystemPrompts && isSessionResetMessage(normalized)) {
       continue;
     }
 

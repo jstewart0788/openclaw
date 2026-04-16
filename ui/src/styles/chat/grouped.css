@@ -46,12 +46,12 @@
 
 .chat-sender-name {
   font-weight: 500;
-  font-size: 12px;
+  font-size: 24px;
   color: var(--muted);
 }
 
 .chat-group-timestamp {
-  font-size: 11px;
+  font-size: 22px;
   color: var(--muted);
   opacity: 0.7;
 }
@@ -136,14 +136,14 @@
 
 /* Avatar Styles */
 .chat-avatar {
-  width: 36px;
-  height: 36px;
+  width: 216px;
+  height: 216px;
   border-radius: var(--radius-md);
   background: var(--panel-strong);
   display: grid;
   place-items: center;
   font-weight: 600;
-  font-size: 13px;
+  font-size: 78px;
   flex-shrink: 0;
   align-self: flex-end;
   margin-bottom: 4px;
@@ -354,7 +354,7 @@ img.chat-avatar {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  font-size: 11px;
+  font-size: 22px;
   line-height: 1;
   color: var(--muted);
   margin-top: 4px;

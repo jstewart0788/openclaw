@@ -422,6 +422,7 @@ export function renderApp(state: AppViewState) {
   const navCollapsed = state.settings.navCollapsed && !navDrawerOpen;
   const showThinking = state.onboarding ? false : state.settings.chatShowThinking;
   const showToolCalls = state.onboarding ? true : state.settings.chatShowToolCalls;
+  const hideSystemPrompts = state.onboarding ? false : state.settings.chatHideSystemPrompts;
   const assistantAvatarUrl = resolveAssistantAvatarUrl(state);
   const chatAvatarUrl = state.chatAvatarUrl ?? assistantAvatarUrl ?? null;
   const configValue =
@@ -616,6 +617,14 @@ export function renderApp(state: AppViewState) {
     setBorderRadius: (value) => state.setBorderRadius(value),
     gatewayUrl: state.settings.gatewayUrl,
     assistantName: state.assistantName,
+    userAvatar: state.settings.userAvatar ?? null,
+    userName: state.settings.userName,
+    onUserAvatarChange: (avatar: string | null) => {
+      state.applySettings({ ...state.settings, userAvatar: avatar });
+    },
+    onUserNameChange: (name: string) => {
+      state.applySettings({ ...state.settings, userName: name || undefined });
+    },
     configPath: state.configSnapshot?.path ?? null,
     rawAvailable: typeof state.configSnapshot?.raw === "string",
   } satisfies Omit<
@@ -1839,6 +1848,7 @@ export function renderApp(state: AppViewState) {
               thinkingLevel: state.chatThinkingLevel,
               showThinking,
               showToolCalls,
+              hideSystemPrompts,
               loading: state.chatLoading,
               sending: state.chatSending,
               compactionStatus: state.compactionStatus,
@@ -1927,6 +1937,7 @@ export function renderApp(state: AppViewState) {
               onSplitRatioChange: (ratio: number) => state.handleSplitRatioChange(ratio),
               assistantName: state.assistantName,
               assistantAvatar: state.assistantAvatar,
+              userAvatar: state.settings.userAvatar ?? null,
               localMediaPreviewRoots: state.localMediaPreviewRoots,
               embedSandboxMode: state.embedSandboxMode,
               allowExternalEmbedUrls: state.allowExternalEmbedUrls,

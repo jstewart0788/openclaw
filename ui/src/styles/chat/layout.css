@@ -446,7 +446,7 @@
   resize: none;
   white-space: pre-wrap;
   font-family: var(--font-body);
-  font-size: 14px;
+  font-size: 28px;
   line-height: 1.45;
 }
 
@@ -509,7 +509,7 @@
   border: none;
   background: transparent;
   color: var(--text);
-  font-size: 0.92rem;
+  font-size: 1.75rem;
   font-family: inherit;
   line-height: 1.4;
   outline: none;
@@ -582,6 +582,25 @@
 .agent-chat__input-btn--active {
   color: var(--accent);
   background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.agent-chat__emoji-wrapper {
+  position: relative;
+  display: inline-flex;
+}
+
+.agent-chat__emoji-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 99;
+}
+
+.agent-chat__emoji-picker {
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  margin-bottom: 8px;
+  z-index: 100;
 }
 
 .agent-chat__input-divider {
