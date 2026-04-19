@@ -112,7 +112,24 @@ export function resolvePluginTools(params: {
   const allowlist = normalizeAllowlist(params.toolAllowlist);
   const blockedPlugins = new Set<string>();
 
-  for (const entry of registry.tools) {
+  // Sort plugin tool registrations by a stable key before iterating so the
+  // serialized tool-definitions prefix is byte-identical turn-to-turn.
+  // Without this, registration order follows plugin load order (Map/filesystem
+  // iteration), which invalidates the Anthropic prompt cache on every request.
+  // See the "Prompt Cache Stability" section of CLAUDE.md.
+  const sortedEntries = [...registry.tools].toSorted((a, b) => {
+    if (a.pluginId !== b.pluginId) {
+      return a.pluginId < b.pluginId ? -1 : 1;
+    }
+    const aNames = a.names.join("\u0000");
+    const bNames = b.names.join("\u0000");
+    if (aNames !== bNames) {
+      return aNames < bNames ? -1 : 1;
+    }
+    return 0;
+  });
+
+  for (const entry of sortedEntries) {
     if (blockedPlugins.has(entry.pluginId)) {
       continue;
     }
