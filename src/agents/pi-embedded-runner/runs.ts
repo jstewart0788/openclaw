@@ -116,7 +116,11 @@ export function queueEmbeddedPiMessage(sessionId: string, text: string): boolean
     return false;
   }
   logMessageQueued({ sessionId, source: "pi-embedded-runner" });
-  void handle.queueMessage(text);
+  handle.queueMessage(text).catch((err) => {
+    diag.warn(
+      `queueMessage failed: sessionId=${sessionId} error=${err instanceof Error ? err.message : String(err)}`,
+    );
+  });
   return true;
 }
 
