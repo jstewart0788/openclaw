@@ -392,6 +392,31 @@ export async function dispatchReplyFromConfig(
     wasMentioned: typeof ctx.WasMentioned === "boolean" ? ctx.WasMentioned : undefined,
   });
 
+  // Fire unscoped inbound_claim across all registered plugins. Trust-tier
+  // classifiers (e.g. ryn-security tier-tagger) consume metadata.source here
+  // as a side effect — they write the resolved tier into an in-process
+  // sender cache that downstream hooks (before_tool_call etc.) read. Without
+  // this, webchat/internal-channel ingress bypasses the hook entirely and
+  // every session defaults to interloper tier, blocking principal tools.
+  // The plugin-bound targeted variant below (runInboundClaimForPluginOutcome)
+  // only fires for messages routed via plugin-owned conversation bindings
+  // (e.g. Discord), so it cannot replace this unscoped invocation.
+  const inboundClaimResult = hookRunner
+    ? await hookRunner.runInboundClaim(inboundClaimEvent, inboundClaimContext)
+    : undefined;
+  if (inboundClaimResult?.handled) {
+    // A plugin claimed the message inline. We don't yet have a generic reply
+    // dispatch path here (the plugin-bound branch below uses sendBindingNotice
+    // which depends on a binding); log and short-circuit so dispatch doesn't
+    // double-process. If/when an unscoped plugin needs to send replies via
+    // this path, wire reply delivery here mirroring the plugin-bound branch.
+    logVerbose(
+      `inbound_claim handled inline by plugin (session=${sessionKey ?? "unknown"}); skipping default dispatch`,
+    );
+    recordProcessed("completed", { reason: "inbound-claim-handled" });
+    return { queuedFinal: false, counts: dispatcher.getQueuedCounts() };
+  }
+
   // Check if we should route replies to originating channel instead of dispatcher.
   // Only route when the originating channel is DIFFERENT from the current surface.
   // This handles cross-provider routing (e.g., message from Telegram being processed
