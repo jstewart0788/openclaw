@@ -4,6 +4,10 @@ Docs: https://docs.openclaw.ai
 
 ## Unreleased
 
+### Changes
+
+- Secrets: add macOS Keychain as a fourth secret source so provider keys can be resolved from the OS keychain via the `security` CLI instead of materializing in env vars or launchd plists; configure with `secrets.providers.<alias>` of source `"keychain"` and reference via `{ source: "keychain", provider: "<alias>", id: "<service-name>" }`. Thanks @jstewart0788.
+
 ### Fixes
 
 - Gateway/Bonjour: keep @homebridge/ciao cancellation handlers registered across advertiser restarts so late probing cancellations cannot crash Linux and other mDNS-churned gateways. Thanks @codex.

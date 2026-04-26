@@ -3,8 +3,10 @@ import { z } from "zod";
 import { isSafeExecutableValue } from "../infra/exec-safety.js";
 import {
   formatExecSecretRefIdValidationMessage,
+  formatKeychainSecretRefIdValidationMessage,
   isValidExecSecretRefId,
   isValidFileSecretRefId,
+  isValidKeychainSecretRefId,
 } from "../secrets/ref-contract.js";
 import { normalizeStringEntries } from "../shared/string-normalization.js";
 import type { ModelCompatConfig } from "./types.models.js";
@@ -75,10 +77,24 @@ const ExecSecretRefSchema = z
   })
   .strict();
 
+const KeychainSecretRefSchema = z
+  .object({
+    source: z.literal("keychain"),
+    provider: z
+      .string()
+      .regex(
+        SECRET_PROVIDER_ALIAS_PATTERN,
+        'Secret reference provider must match /^[a-z][a-z0-9_-]{0,63}$/ (example: "default").',
+      ),
+    id: z.string().refine(isValidKeychainSecretRefId, formatKeychainSecretRefIdValidationMessage()),
+  })
+  .strict();
+
 export const SecretRefSchema = z.discriminatedUnion("source", [
   EnvSecretRefSchema,
   FileSecretRefSchema,
   ExecSecretRefSchema,
+  KeychainSecretRefSchema,
 ]);
 
 export const SecretInputSchema = z.union([z.string(), SecretRefSchema]);
@@ -143,10 +159,29 @@ const SecretsExecProviderSchema = z
   })
   .strict();
 
+const SecretsKeychainProviderSchema = z
+  .object({
+    source: z.literal("keychain"),
+    account: z
+      .string()
+      .refine(
+        isValidKeychainSecretRefId,
+        formatKeychainSecretRefIdValidationMessage().replace(
+          "Keychain secret reference id",
+          "secrets.providers.*.account",
+        ),
+      )
+      .optional(),
+    platform: z.enum(["darwin", "linux", "win32"]).optional(),
+    timeoutMs: z.number().int().positive().max(120000).optional(),
+  })
+  .strict();
+
 export const SecretProviderSchema = z.discriminatedUnion("source", [
   SecretsEnvProviderSchema,
   SecretsFileProviderSchema,
   SecretsExecProviderSchema,
+  SecretsKeychainProviderSchema,
 ]);
 
 export const SecretsConfigSchema = z
@@ -162,6 +197,7 @@ export const SecretsConfigSchema = z
         env: z.string().regex(SECRET_PROVIDER_ALIAS_PATTERN).optional(),
         file: z.string().regex(SECRET_PROVIDER_ALIAS_PATTERN).optional(),
         exec: z.string().regex(SECRET_PROVIDER_ALIAS_PATTERN).optional(),
+        keychain: z.string().regex(SECRET_PROVIDER_ALIAS_PATTERN).optional(),
       })
       .strict()
       .optional(),

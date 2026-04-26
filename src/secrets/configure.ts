@@ -118,11 +118,15 @@ function removeSecretProvider(config: OpenClawConfig, providerAlias: string): bo
     if (defaults?.exec === providerAlias) {
       delete defaults.exec;
     }
+    if (defaults?.keychain === providerAlias) {
+      delete defaults.keychain;
+    }
     if (
       defaults &&
       defaults.env === undefined &&
       defaults.file === undefined &&
-      defaults.exec === undefined
+      defaults.exec === undefined &&
+      defaults.keychain === undefined
     ) {
       delete config.secrets?.defaults;
     }
@@ -137,7 +141,10 @@ function providerHint(provider: SecretProviderConfig): string {
   if (provider.source === "file") {
     return `file (${provider.mode ?? "json"})`;
   }
-  return `exec (${provider.jsonOnly === false ? "json+text" : "json"})`;
+  if (provider.source === "exec") {
+    return `exec (${provider.jsonOnly === false ? "json+text" : "json"})`;
+  }
+  return provider.account ? `keychain (account ${provider.account})` : "keychain";
 }
 
 function toSourceChoices(config: OpenClawConfig): Array<{ value: SecretRefSource; label: string }> {
@@ -615,7 +622,12 @@ async function promptProviderConfig(
   if (source === "file") {
     return await promptFileProvider(current?.source === "file" ? current : undefined);
   }
-  return await promptExecProvider(current?.source === "exec" ? current : undefined);
+  if (source === "exec") {
+    return await promptExecProvider(current?.source === "exec" ? current : undefined);
+  }
+  throw new Error(
+    `Interactive configure for source "${source}" is not yet supported. Edit openclaw.json directly to add a keychain provider, or run "openclaw secrets configure" against an env/file/exec source.`,
+  );
 }
 
 async function configureProvidersInteractive(config: OpenClawConfig): Promise<void> {

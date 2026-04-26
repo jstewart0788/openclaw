@@ -1,10 +1,15 @@
-import { spawn } from "node:child_process";
+import {
+  execFileSync,
+  spawn,
+  type ExecFileSyncOptionsWithStringEncoding,
+} from "node:child_process";
 import fs from "node:fs/promises";
 import path from "node:path";
 import type { OpenClawConfig } from "../config/types.openclaw.js";
 import type {
   ExecSecretProviderConfig,
   FileSecretProviderConfig,
+  KeychainSecretProviderConfig,
   SecretProviderConfig,
   SecretRef,
   SecretRefSource,
@@ -17,7 +22,9 @@ import { runTasksWithConcurrency } from "../utils/run-with-concurrency.js";
 import { readJsonPointer } from "./json-pointer.js";
 import {
   formatExecSecretRefIdValidationMessage,
+  formatKeychainSecretRefIdValidationMessage,
   isValidExecSecretRefId,
+  isValidKeychainSecretRefId,
   SINGLE_VALUE_FILE_REF_ID,
   resolveDefaultSecretProviderAlias,
   secretRefKey,
@@ -32,6 +39,22 @@ const DEFAULT_FILE_MAX_BYTES = 1024 * 1024;
 const DEFAULT_FILE_TIMEOUT_MS = 5_000;
 const DEFAULT_EXEC_TIMEOUT_MS = 5_000;
 const DEFAULT_EXEC_MAX_OUTPUT_BYTES = 1024 * 1024;
+const DEFAULT_KEYCHAIN_TIMEOUT_MS = 5_000;
+
+type KeychainExecFileSync = (
+  command: string,
+  args: string[],
+  options: ExecFileSyncOptionsWithStringEncoding,
+) => string;
+
+let keychainExecFileSync: KeychainExecFileSync = (command, args, options) =>
+  execFileSync(command, args, options) as string;
+
+/** Test seam: replace the macOS `security` CLI invocation with a mock. */
+export function setKeychainExecFileSyncForTests(impl: KeychainExecFileSync | null): void {
+  keychainExecFileSync =
+    impl ?? ((command, args, options) => execFileSync(command, args, options) as string);
+}
 const WINDOWS_ABS_PATH_PATTERN = /^[A-Za-z]:[\\/]/;
 const WINDOWS_UNC_PATH_PATTERN = /^\\\\[^\\]+\\[^\\]+/;
 
@@ -779,6 +802,77 @@ async function resolveExecRefs(params: {
   return resolved;
 }
 
+async function resolveKeychainRefs(params: {
+  refs: SecretRef[];
+  providerName: string;
+  providerConfig: KeychainSecretProviderConfig;
+}): Promise<ProviderResolutionOutput> {
+  const platform = params.providerConfig.platform ?? process.platform;
+  if (platform !== "darwin") {
+    throw providerResolutionError({
+      source: "keychain",
+      provider: params.providerName,
+      message: `Keychain secret provider "${params.providerName}" is not yet supported on platform "${platform}". Currently supported: darwin.`,
+    });
+  }
+  const account = params.providerConfig.account;
+  if (account !== undefined && !isValidKeychainSecretRefId(account)) {
+    throw providerResolutionError({
+      source: "keychain",
+      provider: params.providerName,
+      message: `secrets.providers.${params.providerName}.account is invalid: ${formatKeychainSecretRefIdValidationMessage()}`,
+    });
+  }
+  const timeoutMs = normalizePositiveInt(
+    params.providerConfig.timeoutMs,
+    DEFAULT_KEYCHAIN_TIMEOUT_MS,
+  );
+  const resolved = new Map<string, unknown>();
+  for (const ref of params.refs) {
+    if (!isValidKeychainSecretRefId(ref.id)) {
+      throw refResolutionError({
+        source: "keychain",
+        provider: params.providerName,
+        refId: ref.id,
+        message: formatKeychainSecretRefIdValidationMessage(),
+      });
+    }
+    const args = ["find-generic-password", "-s", ref.id];
+    if (account) {
+      args.push("-a", account);
+    }
+    args.push("-w");
+    let stdout: string;
+    try {
+      stdout = keychainExecFileSync("security", args, {
+        encoding: "utf8",
+        timeout: timeoutMs,
+        stdio: ["ignore", "pipe", "pipe"],
+        windowsHide: true,
+      });
+    } catch (err) {
+      throw refResolutionError({
+        source: "keychain",
+        provider: params.providerName,
+        refId: ref.id,
+        message: `macOS Keychain entry not found (service "${ref.id}"${account ? `, account "${account}"` : ""}).`,
+        cause: err,
+      });
+    }
+    const value = stdout.replace(/\r?\n$/, "");
+    if (!isNonEmptyString(value)) {
+      throw refResolutionError({
+        source: "keychain",
+        provider: params.providerName,
+        refId: ref.id,
+        message: `macOS Keychain entry "${ref.id}" is empty.`,
+      });
+    }
+    resolved.set(ref.id, value);
+  }
+  return resolved;
+}
+
 async function resolveProviderRefs(params: {
   refs: SecretRef[];
   source: SecretRefSource;
@@ -813,6 +907,13 @@ async function resolveProviderRefs(params: {
         limits: params.limits,
       });
     }
+    if (params.providerConfig.source === "keychain") {
+      return await resolveKeychainRefs({
+        refs: params.refs,
+        providerName: params.providerName,
+        providerConfig: params.providerConfig,
+      });
+    }
     throw providerResolutionError({
       source: params.source,
       provider: params.providerName,
@@ -844,6 +945,11 @@ export async function resolveSecretRefValues(
     if (ref.source === "exec" && !isValidExecSecretRefId(id)) {
       throw new Error(
         `${formatExecSecretRefIdValidationMessage()} (ref: ${ref.source}:${ref.provider}:${id}).`,
+      );
+    }
+    if (ref.source === "keychain" && !isValidKeychainSecretRefId(id)) {
+      throw new Error(
+        `${formatKeychainSecretRefIdValidationMessage()} (ref: ${ref.source}:${ref.provider}:${id}).`,
       );
     }
     uniqueRefs.set(secretRefKey(ref), { ...ref, id });

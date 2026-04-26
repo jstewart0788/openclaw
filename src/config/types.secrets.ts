@@ -1,6 +1,6 @@
 import { isRecord } from "../utils.js";
 
-export type SecretRefSource = "env" | "file" | "exec"; // pragma: allowlist secret
+export type SecretRefSource = "env" | "file" | "exec" | "keychain"; // pragma: allowlist secret
 
 /**
  * Stable identifier for a secret in a configured source.
@@ -8,6 +8,7 @@ export type SecretRefSource = "env" | "file" | "exec"; // pragma: allowlist secr
  * - env source: provider "default", id "OPENAI_API_KEY"
  * - file source: provider "mounted-json", id "/providers/openai/apiKey"
  * - exec source: provider "vault", id "openai/api-key"
+ * - keychain source: provider "macKeychain", id "openai-api-key" (macOS service name)
  */
 export type SecretRef = {
   source: SecretRefSource;
@@ -29,6 +30,7 @@ type SecretDefaults = {
   env?: string;
   file?: string;
   exec?: string;
+  keychain?: string;
 };
 
 export function isValidEnvSecretRefId(value: string): boolean {
@@ -43,7 +45,10 @@ export function isSecretRef(value: unknown): value is SecretRef {
     return false;
   }
   return (
-    (value.source === "env" || value.source === "file" || value.source === "exec") &&
+    (value.source === "env" ||
+      value.source === "file" ||
+      value.source === "exec" ||
+      value.source === "keychain") &&
     typeof value.provider === "string" &&
     value.provider.trim().length > 0 &&
     typeof value.id === "string" &&
@@ -58,7 +63,10 @@ function isLegacySecretRefWithoutProvider(
     return false;
   }
   return (
-    (value.source === "env" || value.source === "file" || value.source === "exec") &&
+    (value.source === "env" ||
+      value.source === "file" ||
+      value.source === "exec" ||
+      value.source === "keychain") &&
     typeof value.id === "string" &&
     value.id.trim().length > 0 &&
     value.provider === undefined
@@ -115,7 +123,9 @@ export function coerceSecretRef(value: unknown, defaults?: SecretDefaults): Secr
         ? (defaults?.env ?? DEFAULT_SECRET_PROVIDER_ALIAS)
         : value.source === "file"
           ? (defaults?.file ?? DEFAULT_SECRET_PROVIDER_ALIAS)
-          : (defaults?.exec ?? DEFAULT_SECRET_PROVIDER_ALIAS);
+          : value.source === "exec"
+            ? (defaults?.exec ?? DEFAULT_SECRET_PROVIDER_ALIAS)
+            : (defaults?.keychain ?? DEFAULT_SECRET_PROVIDER_ALIAS);
     return {
       source: value.source,
       provider,
@@ -274,10 +284,20 @@ export type ExecSecretProviderConfig = {
   allowSymlinkCommand?: boolean;
 };
 
+export type KeychainSecretProviderConfig = {
+  source: "keychain";
+  /** Default account name (`-a` flag). Optional; macOS Keychain matches the first entry when omitted. */
+  account?: string;
+  /** Override the host platform for tests; defaults to `process.platform` at resolve time. */
+  platform?: NodeJS.Platform;
+  timeoutMs?: number;
+};
+
 export type SecretProviderConfig =
   | EnvSecretProviderConfig
   | FileSecretProviderConfig
-  | ExecSecretProviderConfig;
+  | ExecSecretProviderConfig
+  | KeychainSecretProviderConfig;
 
 export type SecretsConfig = {
   providers?: Record<string, SecretProviderConfig>;
@@ -285,6 +305,7 @@ export type SecretsConfig = {
     env?: string;
     file?: string;
     exec?: string;
+    keychain?: string;
   };
   resolution?: {
     maxProviderConcurrency?: number;

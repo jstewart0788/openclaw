@@ -7,6 +7,8 @@ import {
 const FILE_SECRET_REF_SEGMENT_PATTERN = /^(?:[^~]|~0|~1)*$/;
 export const SECRET_PROVIDER_ALIAS_PATTERN = /^[a-z][a-z0-9_-]{0,63}$/;
 const EXEC_SECRET_REF_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,255}$/;
+export const KEYCHAIN_SECRET_REF_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:/@-]{0,255}$/;
+export const KEYCHAIN_SECRET_REF_ID_JSON_SCHEMA_PATTERN = "^[A-Za-z0-9][A-Za-z0-9._:/@-]{0,255}$";
 
 export const SINGLE_VALUE_FILE_REF_ID = "value";
 export const FILE_SECRET_REF_ID_PATTERN = /^(?:value|\/(?:[^~]|~0|~1)*(?:\/(?:[^~]|~0|~1)*)*)$/;
@@ -28,6 +30,7 @@ export type SecretRefDefaultsCarrier = {
       env?: string;
       file?: string;
       exec?: string;
+      keychain?: string;
     };
     providers?: Record<string, { source?: string }>;
   };
@@ -47,7 +50,9 @@ export function resolveDefaultSecretProviderAlias(
       ? config.secrets?.defaults?.env
       : source === "file"
         ? config.secrets?.defaults?.file
-        : config.secrets?.defaults?.exec;
+        : source === "exec"
+          ? config.secrets?.defaults?.exec
+          : config.secrets?.defaults?.keychain;
   if (configured?.trim()) {
     return configured.trim();
   }
@@ -104,5 +109,17 @@ export function formatExecSecretRefIdValidationMessage(): string {
     "Exec secret reference id must match /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,255}$/",
     'and must not include "." or ".." path segments',
     '(example: "vault/openai/api-key").',
+  ].join(" ");
+}
+
+export function isValidKeychainSecretRefId(value: string): boolean {
+  return KEYCHAIN_SECRET_REF_ID_PATTERN.test(value);
+}
+
+export function formatKeychainSecretRefIdValidationMessage(): string {
+  return [
+    "Keychain secret reference id must match /^[A-Za-z0-9][A-Za-z0-9._:/@-]{0,255}$/",
+    "and is interpreted as the OS keychain service name",
+    '(example: "openai-api-key").',
   ].join(" ");
 }

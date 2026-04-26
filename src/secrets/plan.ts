@@ -1,6 +1,10 @@
 import type { SecretProviderConfig, SecretRef } from "../config/types.secrets.js";
 import { SecretProviderSchema } from "../config/zod-schema.core.js";
-import { isValidExecSecretRefId, isValidSecretProviderAlias } from "./ref-contract.js";
+import {
+  isValidExecSecretRefId,
+  isValidKeychainSecretRefId,
+  isValidSecretProviderAlias,
+} from "./ref-contract.js";
 import { parseDotPath, toDotPath } from "./shared.js";
 import { resolvePlanTargetAgainstRegistry, type ResolvedPlanTarget } from "./target-registry.js";
 
@@ -129,12 +133,16 @@ export function isSecretsApplyPlan(value: unknown): value is SecretsApplyPlan {
       !resolved ||
       !ref ||
       typeof ref !== "object" ||
-      (ref.source !== "env" && ref.source !== "file" && ref.source !== "exec") ||
+      (ref.source !== "env" &&
+        ref.source !== "file" &&
+        ref.source !== "exec" &&
+        ref.source !== "keychain") ||
       typeof ref.provider !== "string" ||
       ref.provider.trim().length === 0 ||
       typeof ref.id !== "string" ||
       ref.id.trim().length === 0 ||
-      (ref.source === "exec" && !isValidExecSecretRefId(ref.id))
+      (ref.source === "exec" && !isValidExecSecretRefId(ref.id)) ||
+      (ref.source === "keychain" && !isValidKeychainSecretRefId(ref.id))
     ) {
       return false;
     }
