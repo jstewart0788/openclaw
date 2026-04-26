@@ -29,6 +29,7 @@ import { normalizeInputProvenance, type InputProvenance } from "../../sessions/i
 import { resolveSendPolicy } from "../../sessions/send-policy.js";
 import { parseAgentSessionKey } from "../../sessions/session-key-utils.js";
 import { emitSessionTranscriptUpdate } from "../../sessions/transcript-events.js";
+import { isLoopbackIpAddress } from "../../shared/net/ip.js";
 import {
   stripInlineDirectiveTagsForDisplay,
   sanitizeReplyDirectiveId,
@@ -67,6 +68,7 @@ import {
   createManagedOutgoingImageBlocks,
 } from "../managed-image-attachments.js";
 import { ADMIN_SCOPE } from "../method-scopes.js";
+import { stampGatewayPeerInfo } from "../peer-info.js";
 import {
   GATEWAY_CLIENT_CAPS,
   GATEWAY_CLIENT_MODES,
@@ -1911,6 +1913,14 @@ export const chatHandlers: GatewayRequestHandlers = {
       // See: https://github.com/moltbot/moltbot/issues/3658
       const stampedMessage = injectTimestamp(messageForAgent, timestampOptsFromConfig(cfg));
 
+      const connectionScopes: string[] = client?.connect?.scopes ?? [];
+      const peerAddress = client?.clientIp;
+      // peerAddress is undefined for local clients (see message-handler.ts
+      // reportedClientIp derivation, which redacts the address for loopback
+      // peers). Treat that absence as "loopback peer" — the gateway-side
+      // derivation already classified the connection as local; the redaction
+      // is the trusted local-ness signal.
+      const peerIsLoopback = peerAddress === undefined ? true : isLoopbackIpAddress(peerAddress);
       const ctx: MsgContext = {
         Body: messageForAgent,
         BodyForAgent: stampedMessage,
@@ -1932,7 +1942,13 @@ export const chatHandlers: GatewayRequestHandlers = {
         SenderId: clientInfo?.id,
         SenderName: clientInfo?.displayName,
         SenderUsername: clientInfo?.displayName,
-        GatewayClientScopes: client?.connect?.scopes ?? [],
+        GatewayClientScopes: connectionScopes,
+        GatewayPeerInfo: stampGatewayPeerInfo({
+          isLoopback: peerIsLoopback,
+          peerAddress,
+          clientId: clientInfo?.id ?? "",
+          connectionScopes,
+        }),
         ...pluginBoundMediaFields,
       };
 

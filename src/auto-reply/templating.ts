@@ -1,3 +1,4 @@
+import type { GatewayPeerInfo } from "../gateway/peer-info.js";
 import type {
   MediaUnderstandingDecision,
   MediaUnderstandingOutput,
@@ -183,6 +184,19 @@ export type MsgContext = {
   AcpDispatchTailAfterReset?: boolean;
   /** Gateway client scopes when the message originates from the gateway. */
   GatewayClientScopes?: string[];
+  /**
+   * Gateway-stamped, non-spoofable provenance for inbound WS messages. Set ONLY by
+   * gateway server-method code paths that have observed the connection peer address.
+   * Channel plugins and other inbound surfaces leave this undefined.
+   *
+   * Read by `deriveInboundMessageHookContext` and stamped onto the inbound_claim event
+   * at `metadata.source` for trust-tier classifiers (e.g. ryn-security).
+   *
+   * The branded `__gatewayPeerStamp` field exists at the type level to make accidental
+   * construction by non-gateway code paths a compile error. Gateway code uses
+   * `stampGatewayPeerInfo` to produce values.
+   */
+  GatewayPeerInfo?: GatewayPeerInfo;
   /** Trusted system override for contexts that must never inherit owner semantics. */
   ForceSenderIsOwnerFalse?: boolean;
   /** Thread identifier (Telegram topic id or Matrix thread event id). */

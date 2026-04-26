@@ -1,6 +1,7 @@
 import type { FinalizedMsgContext } from "../auto-reply/templating.js";
 import { getChannelPlugin, normalizeChannelId } from "../channels/plugins/index.js";
 import type { OpenClawConfig } from "../config/types.openclaw.js";
+import { type GatewayPeerInfo, toPluginInboundSourceMetadata } from "../gateway/peer-info.js";
 import {
   freezeDiagnosticTraceContext,
   type DiagnosticTraceContext,
@@ -61,6 +62,13 @@ export type CanonicalInboundMessageHookContext = {
   topicName?: string;
   trace?: DiagnosticTraceContext;
   callDepth?: number;
+  /**
+   * Gateway-stamped peer provenance, set ONLY by gateway server-method paths
+   * that observed the connection. Channel plugins, auto-reply, and external
+   * code paths leave this undefined. The branded type prevents accidental
+   * fabrication; see `src/gateway/peer-info.ts`.
+   */
+  gatewayPeer?: GatewayPeerInfo;
 };
 
 export type CanonicalSentMessageHookContext = {
@@ -157,6 +165,7 @@ export function deriveInboundMessageHookContext(
     isGroup,
     groupId: isGroup ? conversationId : undefined,
     topicName: ctx.TopicName,
+    gatewayPeer: ctx.GatewayPeerInfo,
   };
 }
 
@@ -350,6 +359,13 @@ export function toPluginInboundClaimEvent(
       channelName: canonical.channelName,
       groupId: canonical.groupId,
       topicName: canonical.topicName,
+      // `source` is omitted entirely when canonical.gatewayPeer is undefined
+      // (channel plugins, autonomous events, etc). Trust-tier classifiers
+      // must check `metadata?.source?.isLoopback === true` strictly; absence
+      // means "no gateway-stamped provenance available."
+      ...(canonical.gatewayPeer
+        ? { source: toPluginInboundSourceMetadata(canonical.gatewayPeer) }
+        : {}),
     },
   };
   assignTraceFields(event, canonical.trace);

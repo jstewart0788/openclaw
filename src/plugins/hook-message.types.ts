@@ -1,6 +1,25 @@
 import type { DiagnosticTraceContext } from "../infra/diagnostic-trace-context.js";
 import type { PluginConversationBinding } from "./conversation-binding.types.js";
 
+/**
+ * Gateway-stamped, non-spoofable provenance for inbound WS messages, exposed
+ * to plugins inside `PluginHookInboundClaimEvent.metadata.source` when the
+ * inbound surface is the gateway WS chat path. Channel plugins, autonomous
+ * sends, and other inbound surfaces leave `metadata.source` undefined.
+ *
+ * Trust-tier classifiers MUST check `metadata?.source?.isLoopback === true`
+ * strictly — absence means "no gateway-stamped provenance," not "remote
+ * client." Loopback alone is not authentication; combine with `clientId`
+ * and `connectionScopes` (e.g. require `operator.admin`) before granting
+ * elevated tiers.
+ */
+export type PluginHookInboundSource = {
+  readonly isLoopback: boolean;
+  readonly peerAddress: string | undefined;
+  readonly clientId: string;
+  readonly connectionScopes: readonly string[];
+};
+
 export type PluginHookMessageContext = {
   channelId: string;
   accountId?: string;

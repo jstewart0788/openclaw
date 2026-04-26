@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import type { FinalizedMsgContext } from "../auto-reply/templating.js";
 import type { OpenClawConfig } from "../config/config.js";
+import { stampGatewayPeerInfo } from "../gateway/peer-info.js";
 import type { DiagnosticTraceContext } from "../infra/diagnostic-trace-context.js";
 import { setActivePluginRegistry } from "../plugins/runtime.js";
 import { createChannelTestPluginBase, createTestRegistry } from "../test-utils/channel-plugins.js";
@@ -365,6 +366,65 @@ describe("message hook mappers", () => {
       messageId: "out-1",
       isGroup: true,
       groupId: "demo-chat:chat:456",
+    });
+  });
+
+  describe("gateway peer provenance (metadata.source)", () => {
+    it("omits metadata.source when GatewayPeerInfo is absent (channel-plugin path)", () => {
+      const canonical = deriveInboundMessageHookContext(makeInboundCtx());
+      expect(canonical.gatewayPeer).toBeUndefined();
+      const event = toPluginInboundClaimEvent(canonical);
+      expect(event.metadata).toBeDefined();
+      expect((event.metadata as Record<string, unknown>).source).toBeUndefined();
+    });
+
+    it("round-trips loopback control-UI provenance from MsgContext to plugin event", () => {
+      const peer = stampGatewayPeerInfo({
+        isLoopback: true,
+        peerAddress: "127.0.0.1",
+        clientId: "openclaw-control-ui",
+        connectionScopes: ["operator.admin", "operator.write"],
+      });
+      const canonical = deriveInboundMessageHookContext(makeInboundCtx({ GatewayPeerInfo: peer }));
+      expect(canonical.gatewayPeer).toBe(peer);
+
+      const event = toPluginInboundClaimEvent(canonical);
+      const source = (event.metadata as Record<string, unknown>).source as Record<string, unknown>;
+      expect(source).toBeDefined();
+      expect(source.isLoopback).toBe(true);
+      expect(source.peerAddress).toBe("127.0.0.1");
+      expect(source.clientId).toBe("openclaw-control-ui");
+      expect(source.connectionScopes).toEqual(["operator.admin", "operator.write"]);
+    });
+
+    it("propagates non-loopback peer provenance for remote WS connections", () => {
+      const peer = stampGatewayPeerInfo({
+        isLoopback: false,
+        peerAddress: "192.168.1.42",
+        clientId: "openclaw-control-ui",
+        connectionScopes: ["operator.read"],
+      });
+      const canonical = deriveInboundMessageHookContext(makeInboundCtx({ GatewayPeerInfo: peer }));
+
+      const event = toPluginInboundClaimEvent(canonical);
+      const source = (event.metadata as Record<string, unknown>).source as Record<string, unknown>;
+      expect(source.isLoopback).toBe(false);
+      expect(source.peerAddress).toBe("192.168.1.42");
+      expect(source.clientId).toBe("openclaw-control-ui");
+    });
+
+    it("strips brand symbol from plugin-visible source metadata", () => {
+      const peer = stampGatewayPeerInfo({
+        isLoopback: true,
+        peerAddress: undefined,
+        clientId: "openclaw-control-ui",
+        connectionScopes: [],
+      });
+      const canonical = deriveInboundMessageHookContext(makeInboundCtx({ GatewayPeerInfo: peer }));
+      const event = toPluginInboundClaimEvent(canonical);
+      const source = (event.metadata as Record<string, unknown>).source;
+      // The plugin-visible shape carries no symbol-keyed brand:
+      expect(Object.getOwnPropertySymbols(source as object)).toHaveLength(0);
     });
   });
 });
